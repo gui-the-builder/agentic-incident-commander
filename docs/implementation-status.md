@@ -113,7 +113,8 @@ The remaining gaps are measurement and optional scope, not unimplemented feature
 2. Run the two remaining Compose scenarios live through MCP. Only the pool scenario has been
    revalidated since the fixes; the flag scenario was validated earlier through the MCP
    restart path and the worker scenario has not been rerun.
-3. CI configuration exists but has not been exercised by a remote GitHub run.
+3. CI has now run remotely: the `checks` workflow passed twice on pull request #1,
+   covering Ruff, Ruff format, strict mypy, and the deterministic suite on Ubuntu.
 4. Container-mode Ollama inference is unverified. Host connectivity, model presence, and both
    Compose configurations validate, and the pinned image manifest exists.
 5. The optional minimal web UI (T117) was not built. The CLI and API docs cover the operator

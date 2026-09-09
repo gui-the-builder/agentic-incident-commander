@@ -27,7 +27,8 @@ Evidence: `pyproject.toml`, `uv.lock`, `Makefile`, `.env.example`, `infra/compos
 `docs/local-development.md` (host/container Ollama), and `.github/workflows/ci.yml`.
 Structured PostgreSQL log search is the selected local log backend (T008) instead of Loki.
 The live check `test_prometheus_scrapes_services_and_grafana_is_provisioned` passes against
-the running stack. CI has not yet been exercised by a remote GitHub run.
+the running stack. The CI workflow passed on GitHub Actions for pull request #1,
+exercising lint, format, strict typing, and the deterministic suite on Ubuntu.
 
 ---
 

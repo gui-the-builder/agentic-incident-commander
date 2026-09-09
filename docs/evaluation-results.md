@@ -49,6 +49,10 @@ connection pool, verification never passed, and the incident exhausted its eight
 budget in 705.3 seconds. The approval gate behaved correctly throughout: the medium-risk plan
 paused, was approved, executed once, and was never replayed.
 
+Its investigation was also inefficient: 136 tool calls, of which 124 were repeated
+identical calls, and 1,049,366 prompt tokens. Most of that is verification polling against a
+plan that could never pass, but the repetition rate is high enough to track as its own signal.
+
 This is one trial. It shows the evidence-selection gap was a tool defect rather than a
 reasoning limit, and it exposes a separate remediation-selection gap.
 
