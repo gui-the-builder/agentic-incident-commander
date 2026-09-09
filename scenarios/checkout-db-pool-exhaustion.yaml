@@ -1,0 +1,19 @@
+id: checkout-db-pool-exhaustion
+title: Checkout latency high
+service: demo-api
+severity: SEV2
+injection:
+  slow_db: true
+reset: Restore checkout configuration and clear the fixture backlog.
+expected_signals:
+  - Checkout p95 exceeds two seconds under concurrent traffic.
+  - Pool use approaches four connections and acquisition wait rises.
+  - Logs show connection acquisition waits or timeouts.
+distractor_signals:
+  - A recent worker concurrency change is unrelated to checkout latency.
+expected_root_cause: Database connection-pool exhaustion from excessive connection hold time.
+allowed_remediations:
+  - set_demo_feature_flag
+verification:
+  - Checkout p95 at most 500ms for three checks.
+  - DB acquisition wait returns to baseline and error rate stays below 2%.

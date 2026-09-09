@@ -1,0 +1,18 @@
+id: worker-stalled
+title: Worker backlog increasing
+service: demo-worker
+severity: SEV2
+injection:
+  worker_stalled: true
+reset: Resume the consumer and clear pending jobs.
+expected_signals:
+  - Pending jobs accumulate while the processed counter stops increasing.
+  - Last successful job timestamp becomes stale.
+  - Worker liveness and checkout API remain healthy.
+distractor_signals:
+  - A recent checkout configuration change has no effect on the consumer.
+expected_root_cause: Worker consumer stalled while its service remains alive.
+allowed_remediations:
+  - restart_demo_worker
+verification:
+  - Processed counter resumes, backlog falls below ten, last success is current.

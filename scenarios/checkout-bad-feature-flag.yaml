@@ -1,0 +1,18 @@
+id: checkout-bad-feature-flag
+title: Checkout error rate high
+service: demo-api
+severity: SEV2
+injection:
+  new_checkout_path: true
+reset: Disable the new checkout path and clear the fixture backlog.
+expected_signals:
+  - Checkout returns 5xx errors.
+  - Logs contain CheckoutPathError.
+  - Public change history shows the flag was enabled.
+distractor_signals:
+  - A worker warning is unrelated; database acquisition remains healthy.
+expected_root_cause: Bad checkout feature flag enables a failing application path.
+allowed_remediations:
+  - set_demo_feature_flag
+verification:
+  - Checkout errors at most 2%, successful checkout probe, and no new matching exceptions.

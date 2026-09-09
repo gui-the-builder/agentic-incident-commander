@@ -1,0 +1,19 @@
+id: worker-zero-replicas
+title: Worker unavailable and jobs accumulating
+service: demo-worker
+severity: SEV2
+description: Investigate worker availability and delayed job processing.
+injection: Scale the demo-worker Deployment to zero and submit forty checkouts.
+expected_signals:
+  - Desired, ready, and available replicas are zero; no worker pods remain.
+  - The read-only database pending_jobs_count exceeds ten.
+  - Worker health and fresh worker metrics are unavailable.
+distractor_signals:
+  - Checkout HTTP requests and the database remain healthy.
+expected_root_cause: The worker Deployment has zero desired replicas, so no consumer runs.
+allowed_remediations:
+  - scale_demo_worker
+reset: Restore one worker replica, reset database fixtures, and wait for worker readiness.
+verification:
+  - Worker metrics return and the processed counter increases across observations.
+  - Backlog falls below ten and last-success time becomes current.
