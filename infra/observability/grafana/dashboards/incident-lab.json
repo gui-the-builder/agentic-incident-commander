@@ -1,0 +1,12 @@
+{
+  "uid": "incident-lab", "title": "Incident Lab", "schemaVersion": 39,
+  "refresh": "5s", "time": {"from": "now-15m", "to": "now"},
+  "panels": [
+    {"id": 1, "type": "timeseries", "title": "Checkout p95 latency", "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8}, "datasource": {"uid": "prometheus"}, "targets": [{"expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[1m])))"}], "fieldConfig": {"defaults": {"unit": "s"}}},
+    {"id": 2, "type": "timeseries", "title": "Checkout error ratio", "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8}, "datasource": {"uid": "prometheus"}, "targets": [{"expr": "sum(rate(http_5xx_total[1m])) / sum(rate(http_requests_total[1m]))"}], "fieldConfig": {"defaults": {"unit": "percentunit"}}},
+    {"id": 3, "type": "timeseries", "title": "DB pool connections in use", "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8}, "datasource": {"uid": "prometheus"}, "targets": [{"expr": "db_pool_in_use"}]},
+    {"id": 4, "type": "timeseries", "title": "Worker backlog", "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8}, "datasource": {"uid": "prometheus"}, "targets": [{"expr": "worker_jobs_pending"}]},
+    {"id": 5, "type": "timeseries", "title": "Worker processed jobs", "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8}, "datasource": {"uid": "prometheus"}, "targets": [{"expr": "worker_jobs_processed_total"}]},
+    {"id": 6, "type": "timeseries", "title": "Agent run outcomes", "gridPos": {"x": 12, "y": 16, "w": 12, "h": 8}, "datasource": {"uid": "prometheus"}, "targets": [{"expr": "agent_runs_total"}]}
+  ]
+}

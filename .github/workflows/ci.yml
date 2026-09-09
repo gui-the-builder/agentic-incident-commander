@@ -1,0 +1,15 @@
+name: checks
+on: [push, pull_request]
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.29"
+      - run: uv sync --frozen --python 3.12
+      - run: uv run ruff check packages tests migrations
+      - run: uv run ruff format --check packages tests migrations
+      - run: uv run mypy
+      - run: uv run pytest -q

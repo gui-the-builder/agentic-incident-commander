@@ -1,0 +1,148 @@
+name: incident-commander
+x-app: &app
+  build:
+    context: ../..
+    dockerfile: infra/compose/Dockerfile
+  restart: unless-stopped
+  init: true
+  networks: [lab]
+  security_opt: [no-new-privileges:true]
+x-demo-env: &demo-env
+  DEMO_DATABASE_URL: postgresql+psycopg://demo:${DEMO_PASSWORD:?Run bootstrap}@postgres:5432/commander
+  CONTROL_TOKEN: ${CONTROL_TOKEN:?Run bootstrap}
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: commander
+      POSTGRES_DB: commander
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run bootstrap}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:?Run bootstrap}
+      INVESTIGATION_PASSWORD: ${INVESTIGATION_PASSWORD:?Run bootstrap}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-roles.sh:/docker-entrypoint-initdb.d/10-roles.sh:ro
+    networks: [lab]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U commander -d commander"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  migrate:
+    <<: *app
+    restart: "no"
+    command: [python, -m, commander.provision]
+    environment:
+      DATABASE_URL: postgresql+psycopg://commander:${POSTGRES_PASSWORD}@postgres:5432/commander
+    depends_on:
+      postgres: {condition: service_healthy}
+  commander-api:
+    <<: *app
+    ports: ["127.0.0.1:8000:8000"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://commander:${POSTGRES_PASSWORD}@postgres:5432/commander
+      OPERATOR_TOKEN: ${OPERATOR_TOKEN:?Run bootstrap}
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  demo-api:
+    <<: *app
+    command: [uvicorn, "commander.demo:create_app", --factory, --host, 0.0.0.0, --port, "8001"]
+    ports: ["127.0.0.1:8001:8001"]
+    environment: *demo-env
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8001/ready')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  demo-worker:
+    <<: *app
+    command: [uvicorn, "commander.worker:create_app", --factory, --host, 0.0.0.0, --port, "8002"]
+    environment: *demo-env
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8002/ready')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  scenario-controller:
+    <<: *app
+    command: [uvicorn, "commander.scenarios:create_app", --factory, --host, 0.0.0.0, --port, "8003"]
+    ports: ["127.0.0.1:8003:8003"]
+    environment:
+      <<: *demo-env
+      OPERATOR_TOKEN: ${OPERATOR_TOKEN}
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  agent-runtime:
+    <<: *app
+    command: [uvicorn, "commander.runtime:create_app", --factory, --host, 0.0.0.0, --port, "8004"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://commander:${POSTGRES_PASSWORD}@postgres:5432/commander
+      INVESTIGATION_DATABASE_URL: postgresql+psycopg://investigation:${INVESTIGATION_PASSWORD}@postgres:5432/commander
+      CONTROL_TOKEN: ${CONTROL_TOKEN}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma4:12b}
+      TOOL_TRANSPORT: ${TOOL_TRANSPORT:-direct}
+      MODEL_TIMEOUT_SECONDS: ${MODEL_TIMEOUT_SECONDS:-120}
+      MAX_INVESTIGATION_ITERATIONS: ${MAX_INVESTIGATION_ITERATIONS:-8}
+      AUTO_APPROVE_LOW_RISK: ${AUTO_APPROVE_LOW_RISK:-true}
+      ALLOW_MEDIUM_RISK_ACTIONS: ${ALLOW_MEDIUM_RISK_ACTIONS:-true}
+      PROMETHEUS_URL: http://prometheus:9090
+    depends_on:
+      commander-api: {condition: service_healthy}
+      demo-api: {condition: service_healthy}
+      demo-worker: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8004/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  traffic:
+    <<: *app
+    command: [python, -m, commander.traffic]
+    environment:
+      DEMO_API_URL: http://demo-api:8001
+      TRAFFIC_CONCURRENCY: "12"
+    depends_on:
+      demo-api: {condition: service_healthy}
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    ports: ["127.0.0.1:9090:9090"]
+    volumes:
+      - ../observability/prometheus.yaml:/etc/prometheus/prometheus.yml:ro
+    networks: [lab]
+  grafana:
+    image: grafana/grafana:12.1.1
+    ports: ["127.0.0.1:3000:3000"]
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    volumes:
+      - ../observability/grafana:/etc/grafana/provisioning:ro
+    networks: [lab]
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.132.0
+    command: [--config=/etc/otelcol/config.yaml]
+    volumes:
+      - ../observability/otel.yaml:/etc/otelcol/config.yaml:ro
+    networks: [lab]
+networks:
+  lab:
+volumes:
+  postgres-data:
